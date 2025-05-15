@@ -196,7 +196,7 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
       .attr("stroke-dasharray", "5,5");
 
       g1.append("text")
-      .attr("x", innerScatterWidth * 0.1)
+      .attr("x", .8 * innerScatterWidth)
       .attr("y", y1(40) - 10)
       .attr("font-size", "12px")
       .attr("text-anchor", "start")
