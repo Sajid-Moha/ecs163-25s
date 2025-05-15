@@ -3,7 +3,6 @@
 * AI referenced: how to set up automatic SVG resizing
 *
 */
-
 // Set up responsive behavior with aspect ratios
 const container = d3.select("#container");
 const width = window.innerWidth;
@@ -262,11 +261,11 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
         }
       });
 
-      var radius = Math.min(innerPieWidth, innerPieHeight) / 2;
+      var radius = (5 * Math.min(innerPieWidth, innerPieHeight)) / 12;
 
       // append the svg object to the div
       var pie_svg = pieSvg.append("g")
-        .attr("transform", "translate(" + pieWidth / 2 + "," + pieHeight / 2 + ")");
+        .attr("transform", "translate(" + pieWidth / 2  + "," + pieHeight / 2 + ")");
 
       var data = pieData;
 
@@ -299,8 +298,8 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
           .style("opacity", 0.7);
 
       // Legend setup
-      const legendRectSize = 18;
-      const legendSpacing = 4;
+      const legendRectSize = pieWidth * .05;
+      const legendSpacing = legendRectSize * .2;
       const legendHeight = legendRectSize + legendSpacing;
 
       const legend = pie_svg.append("g")
@@ -469,6 +468,7 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
         link.attr("d", d3.sankeyLinkHorizontal());
       }
       
+      // sankey chart
       let node = sankeySvg.append("g")
                       .selectAll(".node")
                       .data(sankeyGraph.nodes)
