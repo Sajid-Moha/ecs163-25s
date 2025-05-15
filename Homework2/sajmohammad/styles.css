@@ -1,0 +1,47 @@
+#content-container {
+  display: flex;
+  flex-direction: column;
+
+  width: 100%;
+
+  background-color: #FF0000;
+
+  text-align: center;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+
+  width: 100%;
+  border: 2px solid orange;
+
+  margin-top: 2em;
+  margin-bottom: 2em;
+
+  background-color: #3B4CCA;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+
+  justify-content: center;
+  align-items: center;
+
+  width: 45%;
+  height: 30em;
+
+  background-color: #FFDE00;
+}
+
+.card > svg {
+  height: 350px;
+  width: 450px;
+  padding-top:20px;
+
+  background-color: white;
+  border: 2px solid black;
+}
