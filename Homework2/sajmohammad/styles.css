@@ -59,7 +59,7 @@ strong {
   justify-content: center;
   align-items: center;
 
-  width: 30%;
+  width: 32%;
   height: 30em;
 
   background-color: #FFDE00;
@@ -78,4 +78,14 @@ strong {
 }
 
 
+@media (max-width: 900px) {
+  .row {
+    flex-direction: column;
+    padding: 10px;
+    gap: 10px;
+  }
 
+  .card {
+    width: 100%;
+  }
+}
