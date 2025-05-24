@@ -331,32 +331,18 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
 
   /* PIE CHART */
   {
+    /* GATHERING DATA TYPES */
+    let types = ['Grass', 'Fire', 'Water', 'Bug', 'Normal', 'Poison', 'Electric',
+                  'Ground', 'Fairy', 'Fighting', 'Psychic', 'Rock', 'Ghost', 'Ice',
+                  'Dragon', 'Dark', 'Steel', 'Flying'];
+    let container = document.getElementById('types-container');
+    let checkedTypes = ['Fire', 'Poison', 'Electric', 'Fighting', 'Ghost', 'Dragon'];
+
     const pieSvg = d3.select("#danger-plot")
                      .attr("width", pieWidth)
                      .attr("height", pieHeight)
                      .attr("viewBox", `0 0 ${pieWidth} ${pieHeight}`)
                      .attr("preserveAspectRatio", "xMidYMid meet");
-
-    let pieData = {"Safe": 0};
-    // types in dataset
-    let unsafe = new Set();
-    unsafe.add("Poison");
-    unsafe.add("Electric");
-    unsafe.add("Fighting");
-    unsafe.add("Ghost");
-    unsafe.add("Dragon");
-    unsafe.add("Fire");
-    
-    rawData.forEach((d) => {
-      if (unsafe.has(d.Type_1)) {
-        if (!pieData[d.Type_1]) {
-          pieData[d.Type_1] = 0;
-        }
-        pieData[d.Type_1] += 1;
-      } else {
-        pieData["Safe"] += 1;
-      }
-    });
 
     var radius = (5 * Math.min(innerPieWidth, innerPieHeight)) / 12;
 
@@ -364,67 +350,127 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
     var pie_svg = pieSvg.append("g")
       .attr("transform", "translate(" + ((pieWidth / 4) + (pieWidth / 6))  + "," + pieHeight / 2 + ")");
 
-    var data = pieData;
-
     // set the color scale
     var color = d3.scaleOrdinal()
-      .domain(Object.keys(data))
       .range(d3.schemeSet2);
 
     // Compute the position of each group on the pie:
     var pie = d3.pie()
       .value(function(d) {return d.value; });
 
-    var data_ready = pie(d3.entries(data));
-
     // shape helper to build arcs:
     var arcGenerator = d3.arc()
       .innerRadius(0)
       .outerRadius(radius);
 
-    // Build the pie chart
-    pie_svg
-      .selectAll('mySlices')
-      .data(data_ready)
-      .enter()
-      .append('path')
+    // Function to update the pie chart
+    function updatePieChart() {
+      let pieData = {"Safe": 0};
+      
+      rawData.forEach((d) => {
+        if (checkedTypes.includes(d.Type_1)) {
+          if (!pieData[d.Type_1]) {
+            pieData[d.Type_1] = 0;
+          }
+          pieData[d.Type_1] += 1;
+        } else {
+          pieData["Safe"] += 1;
+        }
+      });
+
+      // Update color domain
+      color.domain(Object.keys(pieData));
+
+      var data_ready = pie(d3.entries(pieData));
+
+      // Update pie slices
+      const slices = pie_svg
+        .selectAll('path')
+        .data(data_ready);
+
+      slices.enter()
+        .append('path')
+        .merge(slices)
+        .transition()
+        .duration(300)
         .attr('d', arcGenerator)
         .attr('fill', function(d){ return(color(d.data.key)) })
         .attr("stroke", "black")
         .style("stroke-width", "2px")
         .style("opacity", 0.7);
 
-    // Legend setup
-    const legendRectSize = pieWidth * .05;
-    const legendSpacing = legendRectSize * .2;
-    const legendHeight = legendRectSize + legendSpacing;
+      slices.exit().remove();
 
-    const legend = pie_svg.append("g")
-      .attr("class", "legend")
-      .attr("transform", `translate(${radius + 10}, ${-Object.keys(data).length * legendHeight / 2})`);
+      // Update legend
+      const legendRectSize = pieWidth * .05;
+      const legendSpacing = legendRectSize * .2;
+      const legendHeight = legendRectSize + legendSpacing;
 
-    // Create legend items
-    const legendItems = legend.selectAll(".legend-item")
-      .data(data_ready)
-      .enter()
-      .append("g")
-      .attr("class", "legend-item")
-      .attr("transform", (d, i) => `translate(0, ${i * legendHeight})`);
+      // Remove old legend
+      pie_svg.select(".legend").remove();
 
-    // Add colored squares to legend
-    legendItems.append("rect")
-      .attr("width", legendRectSize)
-      .attr("height", legendRectSize)
-      .style("fill", d => color(d.data.key))
-      .style("stroke", "black");
+      // Create new legend
+      const legend = pie_svg.append("g")
+        .attr("class", "legend")
+        .attr("transform", `translate(${radius + 10}, ${-Object.keys(pieData).length * legendHeight / 2})`);
 
-    // Add text labels to legend
-    legendItems.append("text")
-      .attr("x", legendRectSize + legendSpacing)
-      .attr("y", legendRectSize - legendSpacing)
-      .text(d => `${d.data.key} (${d.data.value})`)
-      .style("font-size", "12px")
-      .attr("fill", "black");
+      // Create legend items
+      const legendItems = legend.selectAll(".legend-item")
+        .data(data_ready)
+        .enter()
+        .append("g")
+        .attr("class", "legend-item")
+        .attr("transform", (d, i) => `translate(0, ${i * legendHeight})`);
+
+      // Add colored squares to legend
+      legendItems.append("rect")
+        .attr("width", legendRectSize)
+        .attr("height", legendRectSize)
+        .style("fill", d => color(d.data.key))
+        .style("stroke", "black");
+
+      // Add text labels to legend
+      legendItems.append("text")
+        .attr("x", legendRectSize + legendSpacing)
+        .attr("y", legendRectSize - legendSpacing)
+        .text(d => `${d.data.key} (${d.data.value})`)
+        .style("font-size", "12px")
+        .attr("fill", "black");
+    }
+
+    // Create checkboxes
+    types.forEach(type => {
+      const label = document.createElement('label');
+      label.style.marginRight = '10px';
+      label.style.display = 'inline-block';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.name = 'type';
+      checkbox.value = type;
+      checkbox.checked = checkedTypes.includes(type);
+
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          // add to checkedTypes
+          if (!checkedTypes.includes(type)) {
+            checkedTypes.push(type);
+          }
+        } else {
+          // remove from checkedTypes (fixed the filter logic)
+          checkedTypes = checkedTypes.filter(t => t !== type);
+        }
+        // Update the pie chart when checkbox changes
+        updatePieChart();
+      });
+
+      label.appendChild(checkbox);
+      label.append(` ${type}`);
+      container.appendChild(label);
+    });
+
+    // Initial pie chart render
+    updatePieChart();
   }
 })
 .catch(function(error){
