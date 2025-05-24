@@ -5,6 +5,9 @@ const scatterHeight = 540;
 const pieWidth = 540;
 const pieHeight = 540
 
+const sankeyWidth = 540;
+const sankeyHeight = 540;
+
 // Scatter Margins
 let scatterMargin = {top: 30, right: 30, bottom: 50, left: 60};
 const innerScatterWidth = scatterWidth - scatterMargin.left - scatterMargin.right;
@@ -13,7 +16,15 @@ const innerScatterHeight = scatterHeight - scatterMargin.top - scatterMargin.bot
 // Pie Chart Margins
 let pieMargin = {top: 10, right: pieWidth * .25, bottom: 30, left: 30};
 const innerPieWidth = pieWidth - pieMargin.left - pieMargin.right;
-const innerPieHeight = pieHeight - pieMargin.top - pieMargin.bottom;;
+const innerPieHeight = pieHeight - pieMargin.top - pieMargin.bottom;
+
+// Sankey Plot Margins
+let sankeyMargin = {top: 20, right: 20, bottom: 20, left: 20};
+const innerSankeyWidth = sankeyWidth - sankeyMargin.left - sankeyMargin.right;
+const innerSankeyHeight = sankeyHeight - sankeyMargin.top - sankeyMargin.bottom;
+
+// FOR PIE CHART AND SANKEY DIAGRAM: (initial dangerous types)
+let checkedTypes = ['Fire', 'Poison', 'Electric', 'Fighting', 'Ghost', 'Dragon'];
 
 /*
 *
@@ -336,7 +347,7 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
                   'Ground', 'Fairy', 'Fighting', 'Psychic', 'Rock', 'Ghost', 'Ice',
                   'Dragon', 'Dark', 'Steel', 'Flying'];
     let container = document.getElementById('types-container');
-    let checkedTypes = ['Fire', 'Poison', 'Electric', 'Fighting', 'Ghost', 'Dragon'];
+    // CHECKED TYPES ARRAY DEFINED EARLIER
 
     const pieSvg = d3.select("#danger-plot")
                      .attr("width", pieWidth)
@@ -460,8 +471,11 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
           // remove from checkedTypes (fixed the filter logic)
           checkedTypes = checkedTypes.filter(t => t !== type);
         }
-        // Update the pie chart when checkbox changes
+        // Update both the pie chart and Sankey diagram when checkbox changes
         updatePieChart();
+        if (window.updateSankeyDiagram) {
+          window.updateSankeyDiagram();
+        }
       });
 
       label.appendChild(checkbox);
@@ -471,6 +485,193 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
 
     // Initial pie chart render
     updatePieChart();
+  }
+
+  /*
+  * Sankey Diagram : code modified from documentation "https://d3-graph-gallery.com/graph/sankey_basic.html" &
+  * incorporated checkbox functionality using help from AI
+  */
+  {
+    // Create the SVG container once (outside the update function)
+    let sankeySvg = d3.select("#sankey-plot")
+                    .attr("id", "sankey-svg")
+                    .attr("width", sankeyWidth)
+                    .attr("height", sankeyHeight)
+                    .attr("viewBox", `0 0 ${sankeyWidth} ${sankeyHeight}`)
+                    .attr("preserveAspectRatio", "xMidYMid meet");
+
+    // Create main group for the diagram
+    let sankeyMainGroup = sankeySvg.select("g.sankey-main");
+    if (sankeyMainGroup.empty()) {
+      sankeyMainGroup = sankeySvg.append("g")
+                                .attr("class", "sankey-main")
+                                .attr("transform", `translate(${sankeyMargin.left},${sankeyMargin.top})`);
+    }
+
+    // Color scale used
+    let color = d3.scaleOrdinal()
+                .domain(["Safe Type", "Unsafe Type", "Reasonable Size", "Too Big", "Good Pet", "Bad Pet", "All Pokemon"])
+                .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2"]);
+
+    // Function to update the Sankey diagram
+    function updateSankeyDiagram() {
+      let unsafe = new Set();
+      checkedTypes.forEach((t) => {
+        unsafe.add(t);
+      });
+      
+      let counts = {
+        "safeCount": 0,
+        "unsafeCount": 0,
+        "s_rs_count": 0, // safe -> reasonable size
+        "s_tb_count": 0, // safe -> too big
+        "us_rs_count": 0, // unsafe -> reasonable size
+        "us_tb_count": 0, // unsafe -> too big
+        "rs_gp_count": 0, // reasonable size -> good pet,
+        "rs_bp_count": 0,
+        "tb_bp_count": 0 // too big -> bad pet
+      };
+      
+      rawData.forEach((d) => {
+        let h = Number(d.Height_m);
+        let w = Number(d.Weight_kg);
+        let type = d.Type_1;
+      
+        let max_height = .7;
+        let max_weight = 40;
+        if (!unsafe.has(type)) {
+          counts["safeCount"] += 1;
+          // safe
+          if (h <= max_height && w <= max_weight) {
+            // safe -> reasonable size (good pet)
+            counts["s_rs_count"] += 1;
+            counts["rs_gp_count"] += 1;
+          } else {
+            // safe -> too big (bad pet)
+            counts["s_tb_count"] += 1;
+            counts["tb_bp_count"] += 1;
+          }
+        } else {
+          // unsafe
+          counts["unsafeCount"] += 1;
+          if (h <= max_height && w <= max_weight) {
+            // unsafe -> reasonable size (bad pet)
+            counts["us_rs_count"] += 1;
+            counts["rs_bp_count"] += 1;
+          } else {
+            // unsafe -> too big (bad pet)
+            counts["us_tb_count"] += 1;
+            counts["tb_bp_count"] += 1;
+          }
+        }
+      });
+      
+      let nodes = [
+        {"node": 0, "name": "Safe Type"},
+        {"node": 1, "name": "Unsafe Type"},
+        {"node": 2, "name": "Reasonable Size"},
+        {"node": 3, "name": "Too Big"},
+        {"node": 4, "name": "Good Pet"},
+        {"node": 5, "name": "Bad Pet"},
+        {"node": 6, "name": "All Pokemon"}
+      ];
+      
+      let links = [
+        // origin -> safe
+        {"source": 6, "target": 0, "value": counts["safeCount"]},
+        // origin -> unsafe
+        {"source": 6, "target": 1, "value": counts["unsafeCount"]},
+        // safe -> reasonable size
+        {"source": 0, "target": 2, "value": counts["s_rs_count"]},
+        // safe -> too big
+        {"source": 0, "target": 3, "value": counts["s_tb_count"]},
+        // unsafe -> reasonable size
+        {"source": 1, "target": 2, "value": counts["us_rs_count"]},
+        // unsafe -> too big
+        {"source": 1, "target": 3, "value": counts["us_tb_count"]},
+        // reasonable size -> good pet
+        {"source": 2, "target": 4, "value": counts["rs_gp_count"]},
+        // reasonable size -> bad pet
+        {"source": 2, "target": 5, "value": counts["rs_bp_count"]},
+        // too big -> bad pet
+        {"source": 3, "target": 5, "value": counts["tb_bp_count"]}
+      ];
+
+      // Filter out links with zero values to avoid rendering issues
+      links = links.filter(link => link.value > 0);
+      
+      // Set the sankey diagram properties
+      let sankey = d3.sankey()
+                    .nodeWidth(36)
+                    .nodePadding(40)
+                    .size([innerSankeyWidth, innerSankeyHeight]);
+      
+      // Constructs a new Sankey generator with the default settings
+      let sankeyGraph = sankey({
+        nodes: nodes.map(d => Object.assign({}, d)),
+        links: links.map(d => Object.assign({}, d))
+      });
+
+      // Clear existing content
+      sankeyMainGroup.selectAll("*").remove();
+      
+      // Add the links
+      let link = sankeyMainGroup.append("g")
+                      .attr("class", "links")
+                      .selectAll(".link")
+                      .data(sankeyGraph.links)
+                      .enter().append("path")
+                        .attr("class", "link")
+                        .attr("d", d3.sankeyLinkHorizontal())
+                        .style("fill", "none")
+                        .style("stroke", d => color(d.source.name))
+                        .style("stroke-width", d => Math.max(1, d.width))
+                        .style("stroke-opacity", 0.4)
+                        .sort((a, b) => b.width - a.width);
+      
+      // no drag behavior
+      function dragmove(event, d) {
+        return;
+      }
+      
+      // Add the nodes
+      let node = sankeyMainGroup.append("g")
+                      .attr("class", "nodes")
+                      .selectAll(".node")
+                      .data(sankeyGraph.nodes)
+                      .enter().append("g")
+                        .attr("class", "node")
+                        .attr("transform", d => `translate(${d.x0},${d.y0})`)
+                        .call(d3.drag()
+                          .subject(d => d)
+                          .on("start", function () { this.parentNode.appendChild(this); })
+                          .on("drag", dragmove));
+      
+      // Add the rectangles for the nodes
+      node.append("rect")
+        .attr("height", d => d.y1 - d.y0)
+        .attr("width", sankey.nodeWidth())
+        .style("fill", d => d.color = color(d.name))
+        .style("stroke", d => d3.rgb(d.color).darker(2))
+        .append("title")
+        .text(d => `${d.name}\nCount: ${d.value}`);
+      
+      // Add the title for the nodes
+      node.append("text")
+        .attr("x", d => d.x0 < innerSankeyWidth / 2 ? 6 + sankey.nodeWidth() : -6)
+        .attr("y", d => (d.y1 - d.y0) / 2)
+        .attr("dy", ".35em")
+        .attr("text-anchor", d => d.x0 < innerSankeyWidth / 2 ? "start" : "end")
+        .text(d => d.name)
+        .style("font-size", "12px")
+        .style("pointer-events", "none");
+    }
+
+    // initial render
+    updateSankeyDiagram();
+    
+    // AI generated: Make the update function available globally so it can be called from checkbox events
+    window.updateSankeyDiagram = updateSankeyDiagram;
   }
 })
 .catch(function(error){

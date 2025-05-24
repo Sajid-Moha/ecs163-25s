@@ -42,7 +42,7 @@ strong {
   padding-bottom: 2em;
 }
 
-#sankey-card {
+#size-card {
   padding-top: 2em;
 }
 
@@ -52,4 +52,9 @@ strong {
 
   width: 540px; 
   height: 540px; 
+}
+
+#types-container {
+  width: 80%;
+  margin: auto;
 }
