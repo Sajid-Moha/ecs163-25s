@@ -2,11 +2,18 @@
 const scatterWidth = 540;
 const scatterHeight = 540;
 
+const pieWidth = 540;
+const pieHeight = 540
+
 // Scatter Margins
-let scatterMargin = {top: 30, right: 30, bottom: 50, left: 100};
+let scatterMargin = {top: 30, right: 30, bottom: 50, left: 60};
 const innerScatterWidth = scatterWidth - scatterMargin.left - scatterMargin.right;
 const innerScatterHeight = scatterHeight - scatterMargin.top - scatterMargin.bottom;
 
+// Pie Chart Margins
+let pieMargin = {top: 10, right: pieWidth * .25, bottom: 30, left: 30};
+const innerPieWidth = pieWidth - pieMargin.left - pieMargin.right;
+const innerPieHeight = pieHeight - pieMargin.top - pieMargin.bottom;;
 
 /*
 *
@@ -35,9 +42,8 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
     const scatterSvg = d3.select("#size-plot");
     let k = innerScatterHeight / innerScatterWidth;
 
-    const margin = { top: 20, right: 60, bottom: 60, left: 60 };
-    const totalWidth = innerScatterWidth + margin.left + margin.right;
-    const totalHeight = innerScatterHeight + margin.top + margin.bottom;
+    const totalWidth = scatterWidth;
+    const totalHeight = scatterHeight;
 
     // Store original domain for constraint calculations
     const originalXDomain = [d3.min(processedData, d => d.Height_m), d3.max(processedData, d => d.Height_m)];
@@ -59,7 +65,7 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
 
     // Create main group that's translated to account for margins
     const mainGroup = scatterSvg.append("g")
-                                .attr("transform", `translate(${margin.left}, ${margin.top})`);
+                                .attr("transform", `translate(${scatterMargin.left}, ${scatterMargin.top})`);
 
     // Add clipping path to hide points outside the plot area
     scatterSvg.append("defs")
@@ -204,8 +210,8 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
     scatterSvg.append("text")
               .attr("class", "x-axis-label")
               .attr("text-anchor", "middle")
-              .attr("x", margin.left + innerScatterWidth / 2)
-              .attr("y", margin.top + innerScatterHeight + 40)
+              .attr("x", scatterMargin.left + innerScatterWidth / 2)
+              .attr("y", scatterMargin.top + innerScatterHeight + 40)
               .style("font-size", "14px")
               .style("font-family", "Arial, sans-serif")
               .text("Height (m)");
@@ -213,7 +219,7 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
     scatterSvg.append("text")
               .attr("class", "y-axis-label")
               .attr("text-anchor", "middle")
-              .attr("transform", `translate(${20}, ${margin.top + innerScatterHeight / 2}) rotate(-90)`)
+              .attr("transform", `translate(${20}, ${scatterMargin.top + innerScatterHeight / 2}) rotate(-90)`)
               .style("font-size", "14px")
               .style("font-family", "Arial, sans-serif")
               .text("Weight (kg)");
@@ -274,42 +280,152 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
                 .attr("cy", d => zy(d["Weight_kg"]))
                 .attr("r", 3); // Keep constant size regardless of zoom level
     
-    // Update reference lines and rectangle during zoom
+    // Update reference lines and rectangle during zoom with bounds checking
+    const weightLineY = zy(40);
+    const heightLineX = zx(.71);
+    
     scatter_g_grid.select(".weight-ref-line")
                   .attr("x1", 0)
                   .attr("x2", innerScatterWidth)
-                  .attr("y1", zy(40))
-                  .attr("y2", zy(40));
+                  .attr("y1", weightLineY)
+                  .attr("y2", weightLineY);
                   
     scatter_g_grid.select(".weight-ref-text")
                   .attr("x", .8 * innerScatterWidth)
-                  .attr("y", zy(40) - 10);
+                  .attr("y", weightLineY - 10);
                   
     scatter_g_grid.select(".height-ref-line")
-                  .attr("x1", zx(.71))
-                  .attr("x2", zx(.71))
+                  .attr("x1", heightLineX)
+                  .attr("x2", heightLineX)
                   .attr("y1", 0)
                   .attr("y2", innerScatterHeight);
                   
     scatter_g_grid.select(".height-ref-text")
-                  .attr("x", zx(.71) + 10)
+                  .attr("x", heightLineX + 10)
                   .attr("y", innerScatterHeight * 0.1);
-                  
-    // Update the safe zone rectangle
-    const intersectionX = zx(.71);
-    const intersectionY = zy(40);
     
-    scatter_g_grid.select(".safe-zone-rect")
-                  .attr("x", 0)
-                  .attr("y", intersectionY)
-                  .attr("width", intersectionX)
-                  .attr("height", innerScatterHeight - intersectionY);
+    // Update the safe zone rectangle with bounds checking to prevent negative dimensions
+    const rectX = Math.max(0, Math.min(heightLineX, innerScatterWidth));
+    const rectY = Math.max(0, Math.min(weightLineY, innerScatterHeight));
+    const rectWidth = Math.max(0, rectX);
+    const rectHeight = Math.max(0, innerScatterHeight - rectY);
+    
+    // Only show rectangle if it has positive dimensions and makes sense
+    const rectElement = scatter_g_grid.select(".safe-zone-rect");
+    if (rectWidth > 0 && rectHeight > 0 && rectX >= 0 && rectY <= innerScatterHeight) {
+      rectElement
+        .attr("x", 0)
+        .attr("y", rectY)
+        .attr("width", rectWidth)
+        .attr("height", rectHeight)
+        .style("display", null); // Show the rectangle
+    } else {
+      rectElement.style("display", "none"); // Hide the rectangle when it would be invalid
+    }
     
     scatter_gx.call(scatter_xAxis, zx);
     scatter_gy.call(scatter_yAxis, zy);
     scatter_g_grid.call(scatter_grid, zx, zy);
   }
-}
+  }
+
+  /* PIE CHART */
+  {
+    const pieSvg = d3.select("#danger-plot")
+                     .attr("width", pieWidth)
+                     .attr("height", pieHeight)
+                     .attr("viewBox", `0 0 ${pieWidth} ${pieHeight}`)
+                     .attr("preserveAspectRatio", "xMidYMid meet");
+
+    let pieData = {"Safe": 0};
+    // types in dataset
+    let unsafe = new Set();
+    unsafe.add("Poison");
+    unsafe.add("Electric");
+    unsafe.add("Fighting");
+    unsafe.add("Ghost");
+    unsafe.add("Dragon");
+    unsafe.add("Fire");
+    
+    rawData.forEach((d) => {
+      if (unsafe.has(d.Type_1)) {
+        if (!pieData[d.Type_1]) {
+          pieData[d.Type_1] = 0;
+        }
+        pieData[d.Type_1] += 1;
+      } else {
+        pieData["Safe"] += 1;
+      }
+    });
+
+    var radius = (5 * Math.min(innerPieWidth, innerPieHeight)) / 12;
+
+    // append the svg object to the div
+    var pie_svg = pieSvg.append("g")
+      .attr("transform", "translate(" + ((pieWidth / 4) + (pieWidth / 6))  + "," + pieHeight / 2 + ")");
+
+    var data = pieData;
+
+    // set the color scale
+    var color = d3.scaleOrdinal()
+      .domain(Object.keys(data))
+      .range(d3.schemeSet2);
+
+    // Compute the position of each group on the pie:
+    var pie = d3.pie()
+      .value(function(d) {return d.value; });
+
+    var data_ready = pie(d3.entries(data));
+
+    // shape helper to build arcs:
+    var arcGenerator = d3.arc()
+      .innerRadius(0)
+      .outerRadius(radius);
+
+    // Build the pie chart
+    pie_svg
+      .selectAll('mySlices')
+      .data(data_ready)
+      .enter()
+      .append('path')
+        .attr('d', arcGenerator)
+        .attr('fill', function(d){ return(color(d.data.key)) })
+        .attr("stroke", "black")
+        .style("stroke-width", "2px")
+        .style("opacity", 0.7);
+
+    // Legend setup
+    const legendRectSize = pieWidth * .05;
+    const legendSpacing = legendRectSize * .2;
+    const legendHeight = legendRectSize + legendSpacing;
+
+    const legend = pie_svg.append("g")
+      .attr("class", "legend")
+      .attr("transform", `translate(${radius + 10}, ${-Object.keys(data).length * legendHeight / 2})`);
+
+    // Create legend items
+    const legendItems = legend.selectAll(".legend-item")
+      .data(data_ready)
+      .enter()
+      .append("g")
+      .attr("class", "legend-item")
+      .attr("transform", (d, i) => `translate(0, ${i * legendHeight})`);
+
+    // Add colored squares to legend
+    legendItems.append("rect")
+      .attr("width", legendRectSize)
+      .attr("height", legendRectSize)
+      .style("fill", d => color(d.data.key))
+      .style("stroke", "black");
+
+    // Add text labels to legend
+    legendItems.append("text")
+      .attr("x", legendRectSize + legendSpacing)
+      .attr("y", legendRectSize - legendSpacing)
+      .text(d => `${d.data.key} (${d.data.value})`)
+      .style("font-size", "12px")
+      .attr("fill", "black");
+  }
 })
 .catch(function(error){
     console.log(error);
