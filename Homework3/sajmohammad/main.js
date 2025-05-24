@@ -26,6 +26,10 @@ const innerSankeyHeight = sankeyHeight - sankeyMargin.top - sankeyMargin.bottom;
 // FOR PIE CHART AND SANKEY DIAGRAM: (initial dangerous types)
 let checkedTypes = ['Fire', 'Poison', 'Electric', 'Fighting', 'Ghost', 'Dragon'];
 
+// SIZE REFERENCES
+let maxSafeHeight = 0.7; // default reference: doberman dog
+let maxSafeWeight = 40;  // default reference: doberman dog
+
 /*
 *
 *
@@ -49,6 +53,7 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
   /* SCATTER PLOT */
   // referenced documentation for zoom: https://observablehq.com/@d3/zoomable-scatterplot?collection=@d3/d3-zoom
   // AI Generated part of clipping code to prevent overflow
+  // AI generated snippet for finding change in safety sizes --> modified to update my graph
   {
     const scatterSvg = d3.select("#size-plot");
     let k = innerScatterHeight / innerScatterWidth;
@@ -146,7 +151,7 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
                     .attr("stroke", "blue")
                     .attr("stroke-width", 1);
 
-    // Add doberman references
+    // Add intial doberman references
     {
       const g1 = scatter_g_grid;
 
@@ -292,8 +297,8 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
                 .attr("r", 3); // Keep constant size regardless of zoom level
     
     // Update reference lines and rectangle during zoom with bounds checking
-    const weightLineY = zy(40);
-    const heightLineX = zx(.71);
+    const weightLineY = zy(maxSafeWeight);
+    const heightLineX = zx(maxSafeHeight);
     
     scatter_g_grid.select(".weight-ref-line")
                   .attr("x1", 0)
@@ -338,6 +343,96 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
     scatter_gy.call(scatter_yAxis, zy);
     scatter_g_grid.call(scatter_grid, zx, zy);
   }
+
+  // Add event listener for the update button (move this outside DOMContentLoaded)
+  const updateButton = document.getElementById('update-safety');
+  const heightInput = document.getElementById('max-height');
+  const weightInput = document.getElementById('max-weight');
+
+  if (updateButton && heightInput && weightInput) {
+    updateButton.addEventListener('click', function() {
+      // Get new values from inputs
+      const newHeight = parseFloat(heightInput.value);
+      const newWeight = parseFloat(weightInput.value);
+      
+      // Validate inputs
+      if (isNaN(newHeight) || isNaN(newWeight) || newHeight <= 0 || newWeight <= 0) {
+        alert('Please enter valid positive numbers for height and weight.');
+        return;
+      }
+      
+      // Update global variables
+      maxSafeHeight = newHeight;
+      maxSafeWeight = newWeight;
+      
+      // Update all visualizations
+      updateScatterSafetyLines();
+      if (window.updateSankeyDiagram) {
+        window.updateSankeyDiagram();
+      }
+    });
+    
+    // Allow Enter key to trigger update
+    [heightInput, weightInput].forEach(input => {
+      input.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          updateButton.click();
+        }
+      });
+    });
+  }
+
+  // Add this function to update safety reference lines in scatter plot
+  function updateScatterSafetyLines() {
+    const scatter_g_grid = d3.select("#size-plot g").select("g"); // Adjust selector as needed
+    
+    // Update weight reference line
+    const weightLineY = scatter_y(maxSafeWeight);
+    scatter_g_grid.select(".weight-ref-line")
+                  .transition()
+                  .duration(300)
+                  .attr("y1", weightLineY)
+                  .attr("y2", weightLineY);
+                  
+    scatter_g_grid.select(".weight-ref-text")
+                  .transition()
+                  .duration(300)
+                  .attr("y", weightLineY - 10);
+    
+    // Update height reference line
+    const heightLineX = scatter_x(maxSafeHeight);
+    scatter_g_grid.select(".height-ref-line")
+                  .transition()
+                  .duration(300)
+                  .attr("x1", heightLineX)
+                  .attr("x2", heightLineX);
+                  
+    scatter_g_grid.select(".height-ref-text")
+                  .transition()
+                  .duration(300)
+                  .attr("x", heightLineX + 10);
+    
+    // Update safe zone rectangle
+    const rectX = Math.max(0, Math.min(heightLineX, innerScatterWidth));
+    const rectY = Math.max(0, Math.min(weightLineY, innerScatterHeight));
+    const rectWidth = Math.max(0, rectX);
+    const rectHeight = Math.max(0, innerScatterHeight - rectY);
+    
+    const rectElement = scatter_g_grid.select(".safe-zone-rect");
+    if (rectWidth > 0 && rectHeight > 0 && rectX >= 0 && rectY <= innerScatterHeight) {
+      rectElement
+        .transition()
+        .duration(300)
+        .attr("x", 0)
+        .attr("y", rectY)
+        .attr("width", rectWidth)
+        .attr("height", rectHeight)
+        .style("display", null);
+    } else {
+      rectElement.style("display", "none");
+    }
+  }
+
   }
 
   /* PIE CHART */
@@ -513,159 +608,157 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
                 .domain(["Safe Type", "Unsafe Type", "Reasonable Size", "Too Big", "Good Pet", "Bad Pet", "All Pokemon"])
                 .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2"]);
 
-    // Function to update the Sankey diagram
     function updateSankeyDiagram() {
-      let unsafe = new Set();
-      checkedTypes.forEach((t) => {
-        unsafe.add(t);
-      });
-      
-      let counts = {
-        "safeCount": 0,
-        "unsafeCount": 0,
-        "s_rs_count": 0, // safe -> reasonable size
-        "s_tb_count": 0, // safe -> too big
-        "us_rs_count": 0, // unsafe -> reasonable size
-        "us_tb_count": 0, // unsafe -> too big
-        "rs_gp_count": 0, // reasonable size -> good pet,
-        "rs_bp_count": 0,
-        "tb_bp_count": 0 // too big -> bad pet
-      };
-      
-      rawData.forEach((d) => {
-        let h = Number(d.Height_m);
-        let w = Number(d.Weight_kg);
-        let type = d.Type_1;
-      
-        let max_height = .7;
-        let max_weight = 40;
-        if (!unsafe.has(type)) {
-          counts["safeCount"] += 1;
-          // safe
-          if (h <= max_height && w <= max_weight) {
-            // safe -> reasonable size (good pet)
-            counts["s_rs_count"] += 1;
-            counts["rs_gp_count"] += 1;
-          } else {
-            // safe -> too big (bad pet)
-            counts["s_tb_count"] += 1;
-            counts["tb_bp_count"] += 1;
-          }
-        } else {
-          // unsafe
-          counts["unsafeCount"] += 1;
-          if (h <= max_height && w <= max_weight) {
-            // unsafe -> reasonable size (bad pet)
-            counts["us_rs_count"] += 1;
-            counts["rs_bp_count"] += 1;
-          } else {
-            // unsafe -> too big (bad pet)
-            counts["us_tb_count"] += 1;
-            counts["tb_bp_count"] += 1;
-          }
-        }
-      });
-      
-      let nodes = [
-        {"node": 0, "name": "Safe Type"},
-        {"node": 1, "name": "Unsafe Type"},
-        {"node": 2, "name": "Reasonable Size"},
-        {"node": 3, "name": "Too Big"},
-        {"node": 4, "name": "Good Pet"},
-        {"node": 5, "name": "Bad Pet"},
-        {"node": 6, "name": "All Pokemon"}
-      ];
-      
-      let links = [
-        // origin -> safe
-        {"source": 6, "target": 0, "value": counts["safeCount"]},
-        // origin -> unsafe
-        {"source": 6, "target": 1, "value": counts["unsafeCount"]},
-        // safe -> reasonable size
-        {"source": 0, "target": 2, "value": counts["s_rs_count"]},
-        // safe -> too big
-        {"source": 0, "target": 3, "value": counts["s_tb_count"]},
-        // unsafe -> reasonable size
-        {"source": 1, "target": 2, "value": counts["us_rs_count"]},
-        // unsafe -> too big
-        {"source": 1, "target": 3, "value": counts["us_tb_count"]},
-        // reasonable size -> good pet
-        {"source": 2, "target": 4, "value": counts["rs_gp_count"]},
-        // reasonable size -> bad pet
-        {"source": 2, "target": 5, "value": counts["rs_bp_count"]},
-        // too big -> bad pet
-        {"source": 3, "target": 5, "value": counts["tb_bp_count"]}
-      ];
-
-      // Filter out links with zero values to avoid rendering issues
-      links = links.filter(link => link.value > 0);
-      
-      // Set the sankey diagram properties
-      let sankey = d3.sankey()
-                    .nodeWidth(36)
-                    .nodePadding(40)
-                    .size([innerSankeyWidth, innerSankeyHeight]);
-      
-      // Constructs a new Sankey generator with the default settings
-      let sankeyGraph = sankey({
-        nodes: nodes.map(d => Object.assign({}, d)),
-        links: links.map(d => Object.assign({}, d))
-      });
-
-      // Clear existing content
-      sankeyMainGroup.selectAll("*").remove();
-      
-      // Add the links
-      let link = sankeyMainGroup.append("g")
-                      .attr("class", "links")
-                      .selectAll(".link")
-                      .data(sankeyGraph.links)
-                      .enter().append("path")
-                        .attr("class", "link")
-                        .attr("d", d3.sankeyLinkHorizontal())
-                        .style("fill", "none")
-                        .style("stroke", d => color(d.source.name))
-                        .style("stroke-width", d => Math.max(1, d.width))
-                        .style("stroke-opacity", 0.4)
-                        .sort((a, b) => b.width - a.width);
-      
-      // no drag behavior
-      function dragmove(event, d) {
-        return;
+  let unsafe = new Set();
+  checkedTypes.forEach((t) => {
+    unsafe.add(t);
+  });
+  
+  let counts = {
+    "safeCount": 0,
+    "unsafeCount": 0,
+    "s_rs_count": 0, // safe -> reasonable size
+    "s_tb_count": 0, // safe -> too big
+    "us_rs_count": 0, // unsafe -> reasonable size
+    "us_tb_count": 0, // unsafe -> too big
+    "rs_gp_count": 0, // reasonable size -> good pet,
+    "rs_bp_count": 0,
+    "tb_bp_count": 0 // too big -> bad pet
+  };
+  
+  rawData.forEach((d) => {
+    let h = Number(d.Height_m);
+    let w = Number(d.Weight_kg);
+    let type = d.Type_1;
+  
+    // Use dynamic safety thresholds
+    if (!unsafe.has(type)) {
+      counts["safeCount"] += 1;
+      // safe
+      if (h <= maxSafeHeight && w <= maxSafeWeight) {
+        // safe -> reasonable size (good pet)
+        counts["s_rs_count"] += 1;
+        counts["rs_gp_count"] += 1;
+      } else {
+        // safe -> too big (bad pet)
+        counts["s_tb_count"] += 1;
+        counts["tb_bp_count"] += 1;
       }
-      
-      // Add the nodes
-      let node = sankeyMainGroup.append("g")
-                      .attr("class", "nodes")
-                      .selectAll(".node")
-                      .data(sankeyGraph.nodes)
-                      .enter().append("g")
-                        .attr("class", "node")
-                        .attr("transform", d => `translate(${d.x0},${d.y0})`)
-                        .call(d3.drag()
-                          .subject(d => d)
-                          .on("start", function () { this.parentNode.appendChild(this); })
-                          .on("drag", dragmove));
-      
-      // Add the rectangles for the nodes
-      node.append("rect")
-        .attr("height", d => d.y1 - d.y0)
-        .attr("width", sankey.nodeWidth())
-        .style("fill", d => d.color = color(d.name))
-        .style("stroke", d => d3.rgb(d.color).darker(2))
-        .append("title")
-        .text(d => `${d.name}\nCount: ${d.value}`);
-      
-      // Add the title for the nodes
-      node.append("text")
-        .attr("x", d => d.x0 < innerSankeyWidth / 2 ? 6 + sankey.nodeWidth() : -6)
-        .attr("y", d => (d.y1 - d.y0) / 2)
-        .attr("dy", ".35em")
-        .attr("text-anchor", d => d.x0 < innerSankeyWidth / 2 ? "start" : "end")
-        .text(d => d.name)
-        .style("font-size", "12px")
-        .style("pointer-events", "none");
+    } else {
+      // unsafe
+      counts["unsafeCount"] += 1;
+      if (h <= maxSafeHeight && w <= maxSafeWeight) {
+        // unsafe -> reasonable size (bad pet)
+        counts["us_rs_count"] += 1;
+        counts["rs_bp_count"] += 1;
+      } else {
+        // unsafe -> too big (bad pet)
+        counts["us_tb_count"] += 1;
+        counts["tb_bp_count"] += 1;
+      }
     }
+  });
+  
+  let nodes = [
+    {"node": 0, "name": "Safe Type"},
+    {"node": 1, "name": "Unsafe Type"},
+    {"node": 2, "name": "Reasonable Size"},
+    {"node": 3, "name": "Too Big"},
+    {"node": 4, "name": "Good Pet"},
+    {"node": 5, "name": "Bad Pet"},
+    {"node": 6, "name": "All Pokemon"}
+  ];
+  
+  let links = [
+    // origin -> safe
+    {"source": 6, "target": 0, "value": counts["safeCount"]},
+    // origin -> unsafe
+    {"source": 6, "target": 1, "value": counts["unsafeCount"]},
+    // safe -> reasonable size
+    {"source": 0, "target": 2, "value": counts["s_rs_count"]},
+    // safe -> too big
+    {"source": 0, "target": 3, "value": counts["s_tb_count"]},
+    // unsafe -> reasonable size
+    {"source": 1, "target": 2, "value": counts["us_rs_count"]},
+    // unsafe -> too big
+    {"source": 1, "target": 3, "value": counts["us_tb_count"]},
+    // reasonable size -> good pet
+    {"source": 2, "target": 4, "value": counts["rs_gp_count"]},
+    // reasonable size -> bad pet
+    {"source": 2, "target": 5, "value": counts["rs_bp_count"]},
+    // too big -> bad pet
+    {"source": 3, "target": 5, "value": counts["tb_bp_count"]}
+  ];
+
+  // Filter out links with zero values to avoid rendering issues
+  links = links.filter(link => link.value > 0);
+  
+  // Set the sankey diagram properties
+  let sankey = d3.sankey()
+                .nodeWidth(36)
+                .nodePadding(40)
+                .size([innerSankeyWidth, innerSankeyHeight]);
+  
+  // Constructs a new Sankey generator with the default settings
+  let sankeyGraph = sankey({
+    nodes: nodes.map(d => Object.assign({}, d)),
+    links: links.map(d => Object.assign({}, d))
+  });
+
+  // Clear existing content
+  sankeyMainGroup.selectAll("*").remove();
+  
+  // Add the links
+  let link = sankeyMainGroup.append("g")
+                  .attr("class", "links")
+                  .selectAll(".link")
+                  .data(sankeyGraph.links)
+                  .enter().append("path")
+                    .attr("class", "link")
+                    .attr("d", d3.sankeyLinkHorizontal())
+                    .style("fill", "none")
+                    .style("stroke", d => color(d.source.name))
+                    .style("stroke-width", d => Math.max(1, d.width))
+                    .style("stroke-opacity", 0.4)
+                    .sort((a, b) => b.width - a.width);
+  
+  // no drag behavior
+  function dragmove(event, d) {
+    return;
+  }
+  
+  // Add the nodes
+  let node = sankeyMainGroup.append("g")
+                  .attr("class", "nodes")
+                  .selectAll(".node")
+                  .data(sankeyGraph.nodes)
+                  .enter().append("g")
+                    .attr("class", "node")
+                    .attr("transform", d => `translate(${d.x0},${d.y0})`)
+                    .call(d3.drag()
+                      .subject(d => d)
+                      .on("start", function () { this.parentNode.appendChild(this); })
+                      .on("drag", dragmove));
+  
+  // Add the rectangles for the nodes
+  node.append("rect")
+    .attr("height", d => d.y1 - d.y0)
+    .attr("width", sankey.nodeWidth())
+    .style("fill", d => d.color = color(d.name))
+    .style("stroke", d => d3.rgb(d.color).darker(2))
+    .append("title")
+    .text(d => `${d.name}\nCount: ${d.value}`);
+  
+  // Add the title for the nodes
+  node.append("text")
+    .attr("x", d => d.x0 < innerSankeyWidth / 2 ? 6 + sankey.nodeWidth() : -6)
+    .attr("y", d => (d.y1 - d.y0) / 2)
+    .attr("dy", ".35em")
+    .attr("text-anchor", d => d.x0 < innerSankeyWidth / 2 ? "start" : "end")
+    .text(d => d.name)
+    .style("font-size", "12px")
+    .style("pointer-events", "none");
+}
 
     // initial render
     updateSankeyDiagram();
@@ -677,3 +770,5 @@ d3.csv("pokemon_alopez247.csv").then(rawData => {
 .catch(function(error){
     console.log(error);
 });
+
+

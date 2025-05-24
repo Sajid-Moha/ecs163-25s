@@ -11,8 +11,26 @@
   <h1 style="text-align: center;">Are Pokemon reasonable pets?</h1>
   <div id="content-container">
     <div id="size-card" class="card">
-      <h3>Reasonable Size Pokemon Scatter Plot</h3>
-      <p><strong>Reference Upper Limit: Doberman Pinscher Dog (reasonably large pet)</strong></p>
+      <h3>Reasonable Size Pokemon Scatter Plot (Zoomable! Scroll mouse wheel)</h3>
+      <!-- AI generated button area -->
+      <div id="safety-controls" style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap; width: 100%; justify-content: center; margin-top: 1.5em;">
+          <div>
+            <label for="max-height">Max Safe Height (m):</label>
+            <input type="number" id="max-height" step="0.1" min="0.1" max="10" value="0.7">
+          </div>
+          <div>
+              <label for="max-weight">Max Safe Weight (kg):</label>
+              <input type="number" id="max-weight" step="1" min="1" max="1000" value="40">
+          </div>
+          <div>
+            <button id="update-safety">
+              Update Safety Lines
+            </button>
+          </div>
+        <p>
+          Initial Reference: Doberman (BIG) Dog. Adjust to set new safety thresholds.
+        </p>
+      </div>
       <svg id="size-plot"></svg>
     </div>
     <div id="danger-card" class="card">
